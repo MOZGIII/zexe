@@ -222,7 +222,7 @@ impl<F: Field> ConstraintSystem<F> {
     fn lc_num_times_used(&self, count_sinks: bool) -> (Vec<usize>, Vec<usize>) {
         // step 1: Identify all lcs that have been many times
         let mut num_times_used = vec![0; self.lc_map.len()];
-        let mut inDegree = vec![0; self.lc_map.len()];
+        let mut in_degree = vec![0; self.lc_map.len()];
 
         for (index, lc) in self.lc_map.iter() {
             num_times_used[index.0] += count_sinks as usize;
@@ -231,11 +231,11 @@ impl<F: Field> ConstraintSystem<F> {
                 if var.is_lc() {
                     let lc_index = var.get_lc_index().expect("should be lc");
                     num_times_used[lc_index.0] += 1;
-                    inDegree[index.0] += 1;
+                    in_degree[index.0] += 1;
                 }
             }
         }
-        (num_times_used, inDegree)
+        (num_times_used, in_degree)
     }
 
     /// Naively inlines symbolic linear combinations into the linear combinations
@@ -248,18 +248,18 @@ impl<F: Field> ConstraintSystem<F> {
     /// is the dominating cost.
     pub fn inline_all_lcs(&mut self) {
         let mut inlined_lcs = BTreeMap::new();
-        let (mut num_times_used, inDegree) = self.lc_num_times_used(false);
+        let (mut num_times_used, in_degree) = self.lc_num_times_used(false);
         //println!("num times used {:?}", num_times_used.clone());
         //TODO a concurrent queue to store LCs to be inlined in topological order.
-        //TODO a worker abstraction to pull LCs from queue 
+        //TODO a worker abstraction to pull LCs from queue
         println!("before inlining, lc_map len {}", self.lc_map.len());
         /*
         TODO remove current lc from self.lc_map to save more memory space? but the rust compiler will stop this action i guess.
         */
         let map_len = self.lc_map.len();
-        for i in 0..map_len{
+        for i in 0..map_len {
             let index = LcIndex(i);
-            let lc : LinearCombination<F>= self.lc_map.remove(&index).unwrap();
+            let lc: LinearCombination<F> = self.lc_map.remove(&index).unwrap();
             let mut inlined_lc = LinearCombination::new();
             for &(coeff, var) in lc.iter() {
                 if var.is_lc() {
@@ -279,12 +279,11 @@ impl<F: Field> ConstraintSystem<F> {
                     // substitute it in directly.
                     inlined_lc.push((coeff, var));
                 }
-            } 
+            }
             inlined_lc.compactify();
             inlined_lcs.insert(index, inlined_lc);
         }
-        
-        
+
         // for (&index, lc) in &self.lc_map {
         //     let mut inlined_lc = LinearCombination::new();
         //     for &(coeff, var) in lc.iter() {
@@ -312,12 +311,15 @@ impl<F: Field> ConstraintSystem<F> {
 
         let sys = System::new();
         match sys.memory() {
-            Ok(mem) => println!("\nMemory: {} used / {}", saturating_sub_bytes(mem.total, mem.free), mem.total),
-            Err(x) => println!("\nMemory: error: {}", x)
+            Ok(mem) => println!(
+                "\nMemory: {} used / {}",
+                saturating_sub_bytes(mem.total, mem.free),
+                mem.total
+            ),
+            Err(x) => println!("\nMemory: error: {}", x),
         }
         self.lc_map = inlined_lcs;
         println!("after inlining lcs, lcs map len is {}", self.lc_map.len());
-
     }
 
     /// If a `SymbolicLc` is used in more than one location, this method makes a new
